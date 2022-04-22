@@ -54,7 +54,7 @@ class ClassWithNewUnionSyntax(TestSetup):
 
 @dataclass
 class OtherClassWithNewUnionSyntax(ClassWithNewUnionSyntax):
-    """Create a child class without annotations, just to check taht they are picked up from the
+    """Create a child class without annotations, just to check that they are picked up from the
     base class.
     """
 
@@ -69,7 +69,9 @@ def test_new_union_syntax(ClassWithNewUnionSyntax: type[ClassWithNewUnionSyntax]
     assert ClassWithNewUnionSyntax.setup("--v 456") == ClassWithNewUnionSyntax(v=456)
     assert ClassWithNewUnionSyntax.setup("--v 4.56") == ClassWithNewUnionSyntax(v=4.56)
 
-    field_annotations = {f.name: f.type for f in dataclasses.fields(ClassWithNewUnionSyntax)}
+    field_annotations = {
+        f.name: f.type for f in dataclasses.fields(ClassWithNewUnionSyntax)
+    }
     from simple_parsing.utils import is_union
 
     assert is_union(field_annotations["v"])
@@ -95,15 +97,14 @@ def test_more_complicated_unions():
     U = TypeVar("U")
     V = TypeVar("V")
 
-
-
     class Try(Generic[T, U]):
-        """ Returns a callable that attempts to use the given functions, and returns the first
+        """Returns a callable that attempts to use the given functions, and returns the first
         result that is obtained without raising an exception.
-        
+
         If all the functions fail, calls `none_worked` if it's a callable, or returns it as a value
         if it isn't a callable.
         """
+
         def __init__(
             self,
             *functions: Callable[..., T] | Callable[..., U],
@@ -128,9 +129,10 @@ def test_more_complicated_unions():
 
         def none_worked(self, exceptions: list[Exception]) -> typing.NoReturn:
             raise RuntimeError(
-                f"None of the functions worked!\n" +
-                "\n".join("- Function {func} raised: {exc}\n"
-                for func, exc in zip(self.functions, exceptions)
+                f"None of the functions worked!\n"
+                + "\n".join(
+                    "- Function {func} raised: {exc}\n"
+                    for func, exc in zip(self.functions, exceptions)
                 )
             )
 
@@ -163,17 +165,25 @@ def test_more_complicated_unions():
     ArgumentParser().add_arguments(MoreComplex, dest="unused")
     field_annotations = {f.name: f.type for f in dataclasses.fields(MoreComplex)}
     assert field_annotations["vals_list"] == typing.List[typing.Union[int, float]]
-    assert field_annotations["vals_tuple"] == typing.Tuple[typing.Union[int, float], bool]
+    assert (
+        field_annotations["vals_tuple"] == typing.Tuple[typing.Union[int, float], bool]
+    )
 
     assert is_list(field_annotations["vals_list"])
     assert is_tuple(field_annotations["vals_tuple"])
 
     assert MoreComplex.setup("--vals_list 456 123") == MoreComplex(vals_list=[456, 123])
-    assert MoreComplex.setup("--vals_list 4.56 1.23") == MoreComplex(vals_list=[4.56, 1.23])
+    assert MoreComplex.setup("--vals_list 4.56 1.23") == MoreComplex(
+        vals_list=[4.56, 1.23]
+    )
     # NOTE: Something funky is happening: Seems like the `float` type here is being registered as
     # the handler also in the second case, for the tuple!
-    assert MoreComplex.setup("--vals_tuple 456 False") == MoreComplex(vals_tuple=(456, False))
-    assert MoreComplex.setup("--vals_tuple 4.56 True") == MoreComplex(vals_tuple=(4.56, True))
+    assert MoreComplex.setup("--vals_tuple 456 False") == MoreComplex(
+        vals_tuple=(456, False)
+    )
+    assert MoreComplex.setup("--vals_tuple 4.56 True") == MoreComplex(
+        vals_tuple=(4.56, True)
+    )
 
 
 @pytest.mark.xfail(reason="TODO: Properly support containers of union types.")
@@ -187,3 +197,36 @@ def test_parsing_containers_of_unions():
     assert MoreComplex.setup("--vals_list 4.56 1.23") == MoreComplex(vals_list=[4.56, 1.23])
     assert MoreComplex.setup("--vals_tuple 456 False") == MoreComplex(vals_tuple=(456, False))
     assert MoreComplex.setup("--vals_tuple 4.56 True") == MoreComplex(vals_tuple=(4.56, True))
+
+
+from dataclasses import dataclass
+from simple_parsing.helpers import Serializable
+
+
+@dataclass
+class Opts1(Serializable):
+    a: int = 64
+    b: float = 1.0
+
+
+@dataclass
+class Opts2(Serializable):
+    a: int = 32
+    b: float = 0.0
+
+
+@dataclass
+class Wrapper(Serializable):
+    opts1: Opts1 = Opts1()
+    opts2: Opts2 = Opts2()
+
+
+def test_serialization_deserialization():
+    # Show that it's not possible to deserialize nested dataclasses
+    opts = Wrapper()
+    assert Wrapper in Serializable.subclasses
+    assert Opts1 in Serializable.subclasses
+    assert Opts2 in Serializable.subclasses
+    assert Wrapper.from_dict(opts.to_dict()) == opts
+    assert Wrapper.loads_json(opts.dumps_json()) == opts
+    assert Wrapper.loads_yaml(opts.dumps_yaml()) == opts

@@ -7,9 +7,12 @@ from typing import *
 
 import pytest
 
+pytest.register_assert_rewrite("test.testutils")
+
+
 from simple_parsing import choice
 from simple_parsing.helpers import Serializable
-from .testutils import TestSetup
+
 
 collect_ignore = []
 if sys.version_info < (3, 7):
@@ -59,7 +62,9 @@ def assert_equals_stdout(capsys):
     def strip(string):
         return "".join(string.split())
 
-    def should_equal(expected: str, file_path: str = None):
+    def should_equal(expected: str, file_path: Optional[str] = None):
+        if "optional arguments" in expected and sys.version_info >= (3, 10):
+            expected = expected.replace("optional arguments", "options")
         out = capsys.readouterr().out
         assert strip(out) == strip(expected), file_path
 
@@ -127,6 +132,7 @@ def TaskHyperParameters():
     """Test fixture that gives a good example use-case from a real datascience
     project.
     """
+    from .testutils import TestSetup
 
     @dataclass
     class TaskHyperParameters(TestSetup, Serializable):
@@ -141,18 +147,18 @@ def TaskHyperParameters():
             "tanh", "relu", "linear", default="tanh"
         )  # activation function
         use_batchnorm: bool = (
-            False  # wether or not to use batch normalization after each dense layer
+            False  # whether or not to use batch normalization after each dense layer
         )
-        use_dropout: bool = True  # wether or not to use dropout after each dense layer
+        use_dropout: bool = True  # whether or not to use dropout after each dense layer
         dropout_rate: float = 0.1  # the dropout rate
         use_image_features: bool = (
-            True  # wether or not image features should be used as input
+            True  # whether or not image features should be used as input
         )
-        use_likes: bool = True  # wether or not 'likes' features should be used as input
+        use_likes: bool = True  # whether or not 'likes' features should be used as input
         l1_reg: float = 0.005  # L1 regularization coefficient
         l2_reg: float = 0.005  # L2 regularization coefficient
 
-        # Wether or not a task-specific Embedding layer should be used on the 'likes' features.
+        # Whether or not a task-specific Embedding layer should be used on the 'likes' features.
         # When set to 'True', it is expected that there no shared embedding is used.
         embed_likes: bool = False
 
@@ -161,6 +167,8 @@ def TaskHyperParameters():
 
 @pytest.fixture
 def HyperParameters(TaskHyperParameters):
+    from .testutils import TestSetup
+
     @dataclass
     class HyperParameters(TestSetup, Serializable):
         """Hyperparameters of a multi-headed model."""
@@ -186,7 +194,7 @@ def HyperParameters(TaskHyperParameters):
 
         shared_likes_embedding: bool = True
 
-        # Wether or not to better filtering of liked pages
+        # Whether or not to better filtering of liked pages
         use_custom_likes: bool = True
 
         # Gender model settings
